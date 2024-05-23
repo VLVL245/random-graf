@@ -76,30 +76,50 @@ links: Link[]
 	}
 
 	const links: Link[] = []
-	const maxAttemptsPerNode = 15
+	let maxAttemptsPerNode = 3
 
-	let potentialLinks: {source: Node, target: Node, dist: number}[] = []
+	const attempts = new Map<string, number>()
+
+	let potentialLinks: { source: Node, target: Node, dist: number }[] = []
 	nodes.forEach((nodeA, indexA) => {
 		nodes.forEach((nodeB, indexB) => {
 			if (indexA !== indexB) {
 				potentialLinks.push({
-				source: nodeA,
-				target: nodeB,
-				dist: distance(nodeA, nodeB)
+					source: nodeA,
+					target: nodeB,
+					dist: distance(nodeA, nodeB)
 				})
 			}
 		})
 	})
 	potentialLinks.sort((a, b) => a.dist - b.dist)
 
-	function createLinks() {
-		let attempts = new Map<string, number>()
+	// Алгоритм Краскала для создания минимального остовного дерева
+	function kruskal() {
+		const parent = new Map<string, string>()
+
+		function find(node: string): string {
+				if (parent.get(node) !== node) {
+					parent.set(node, find(parent.get(node)!))
+				}
+			return parent.get(node)!
+		}
+
+		function union(nodeA: string, nodeB: string) {
+			const rootA = find(nodeA)
+			const rootB = find(nodeB)
+			if (rootA !== rootB) {
+				parent.set(rootA, rootB)
+			}
+		}
+
+		nodes.forEach(node => parent.set(node.id, node.id))
 
 		potentialLinks.forEach(linkInfo => {
-			const attemptsSource = attempts.get(linkInfo.source.id) || 0
-			const attemptsTarget = attempts.get(linkInfo.target.id) || 0
+			const rootSource = find(linkInfo.source.id)
+			const rootTarget = find(linkInfo.target.id)
 
-			if (attemptsSource < maxAttemptsPerNode && attemptsTarget < maxAttemptsPerNode) {
+			if (rootSource !== rootTarget) {
 				let intersects = links.some(link => {
 					const sourceNode = nodes.find(n => n.id === link.source)
 					const targetNode = nodes.find(n => n.id === link.target)
@@ -117,25 +137,58 @@ links: Link[]
 						target: linkInfo.target.id,
 						value: 0.8
 					})
-					attempts.set(linkInfo.source.id, 0)
-					attempts.set(linkInfo.target.id, 0)
-				} else {
-					attempts.set(linkInfo.source.id, attemptsSource + 1)
-					attempts.set(linkInfo.target.id, attemptsTarget + 1)
+					union(linkInfo.source.id, linkInfo.target.id)
 				}
+			}
+		});
+	}
+
+	// Создаем связи с использованием алгоритма Краскала
+	kruskal()
+// Дополнительные связи для увеличения количества соединений
+	function createAdditionalLinks() {
+		potentialLinks.forEach(linkInfo => {
+			const attemptsSource = attempts.get(linkInfo.source.id) || 0
+			const attemptsTarget = attempts.get(linkInfo.target.id) || 0
+
+			if (attemptsSource < maxAttemptsPerNode && attemptsTarget < maxAttemptsPerNode) {
+				let intersects = links.some(link => {
+					const sourceNode = nodes.find(n => n.id === link.source)
+					const targetNode = nodes.find(n => n.id === link.target)
+					return sourceNode && targetNode && doLinesIntersect(
+						linkInfo.source,
+						linkInfo.target,
+						sourceNode,
+						targetNode
+					);
+				});
+
+			if (!intersects) {
+				links.push({
+					source: linkInfo.source.id,
+					target: linkInfo.target.id,
+					value: 0.8
+				});
+			attempts.set(linkInfo.source.id, 0)
+			attempts.set(linkInfo.target.id, 0)
+			} else {
+				attempts.set(linkInfo.source.id, attemptsSource + 1)
+				attempts.set(linkInfo.target.id, attemptsTarget + 1)
+			}
 			}
 		})
 	}
 
 
-	createLinks();
+	createAdditionalLinks()
 
-	nodes.map((node) => {
-		let fiendLink = links.find((link) => link.source === node.id || link.target === node.id)
-		if (fiendLink === undefined) {
+
+	nodes.forEach(node => {
+		let foundLink = links.find(link => link.source === node.id || link.target === node.id)
+		if (!foundLink) {
 			node.group = 3
 		}
 	})
 
-	return { nodes, links };
+	return { nodes, links }
 }
