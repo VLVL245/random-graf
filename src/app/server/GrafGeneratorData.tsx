@@ -152,5 +152,23 @@ links: Link[]
 		}
 	})
 
+
+
+function findFinalNodes(): string[] {
+	const linesNodes: string[] = []
+
+	links.forEach((link) => {
+		linesNodes.push(
+			link.source,
+			link.target
+		)
+	})
+	return linesNodes.filter((node) => linesNodes.indexOf(node) === linesNodes.lastIndexOf(node))
+}
+
+const finalNodes: string[] = findFinalNodes()
+
+console.log(finalNodes)
+
 	return { nodes, links }
 }
