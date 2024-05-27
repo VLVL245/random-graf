@@ -76,7 +76,6 @@ links: Link[]
 	}
 
 	const links: Link[] = []
-	let maxAttemptsPerNode = 3
 
 	const attempts = new Map<string, number>()
 
@@ -145,43 +144,6 @@ links: Link[]
 
 	// Создаем связи с использованием алгоритма Краскала
 	kruskal()
-// Дополнительные связи для увеличения количества соединений
-	function createAdditionalLinks() {
-		potentialLinks.forEach(linkInfo => {
-			const attemptsSource = attempts.get(linkInfo.source.id) || 0
-			const attemptsTarget = attempts.get(linkInfo.target.id) || 0
-
-			if (attemptsSource < maxAttemptsPerNode && attemptsTarget < maxAttemptsPerNode) {
-				let intersects = links.some(link => {
-					const sourceNode = nodes.find(n => n.id === link.source)
-					const targetNode = nodes.find(n => n.id === link.target)
-					return sourceNode && targetNode && doLinesIntersect(
-						linkInfo.source,
-						linkInfo.target,
-						sourceNode,
-						targetNode
-					);
-				});
-
-			if (!intersects) {
-				links.push({
-					source: linkInfo.source.id,
-					target: linkInfo.target.id,
-					value: 0.8
-				});
-			attempts.set(linkInfo.source.id, 0)
-			attempts.set(linkInfo.target.id, 0)
-			} else {
-				attempts.set(linkInfo.source.id, attemptsSource + 1)
-				attempts.set(linkInfo.target.id, attemptsTarget + 1)
-			}
-			}
-		})
-	}
-
-
-	createAdditionalLinks()
-
 
 	nodes.forEach(node => {
 		let foundLink = links.find(link => link.source === node.id || link.target === node.id)
