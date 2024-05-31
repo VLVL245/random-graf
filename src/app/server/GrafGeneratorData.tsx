@@ -166,9 +166,93 @@ function findFinalNodes(): string[] {
 	return linesNodes.filter((node) => linesNodes.indexOf(node) === linesNodes.lastIndexOf(node))
 }
 
-const finalNodes: string[] = findFinalNodes()
+const finalNodesListId: string[] = findFinalNodes()
 
+const finalNodes: Node[] = []
+
+finalNodesListId.forEach((finalNode) => {
+	nodes.forEach((node) => {
+		if(finalNode === node.id) {
+			finalNodes.push({
+				id: node.id,
+				group:node.group,
+				x: node.x,
+				y: node.y
+		})
+		}
+	})
+})
+
+// Функция для вычисления угла между двумя точками
+function angle(p1: Node, p2: Node): number {
+	return Math.atan2(p2.y - p1.y, p2.x - p1.x);
+ }
+ 
+ // Функция для вычисления векторного произведения
+ function cross(o: Node, a: Node, b: Node): number {
+	return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+ }
+ 
+ // Функция для построения выпуклой оболочки вокруг одной точки
+ function buildConvexHull(points: Node[]): Node[] {
+	if (points.length < 3) return points;
+ 
+	// Находим самую нижнюю точку (если несколько, выбираем самую левую)
+	const start = points.reduce((prev, curr) => (curr.y < prev.y || (curr.y === prev.y && curr.x < prev.x)) ? curr : prev);
+ 
+	// Сортируем точки по углу и расстоянию от стартовой точки
+	const sortedPoints = points.slice().sort((a, b) => {
+	  const ang = angle(start, a) - angle(start, b);
+	  return ang === 0 ? distance(start, a) - distance(start, b) : ang;
+	});
+ 
+	const hull: Node[] = [];
+	for (const point of sortedPoints) {
+	  while (hull.length >= 2 && cross(hull[hull.length - 2], hull[hull.length - 1], point) <= 0) {
+		 hull.pop();
+	  }
+	  hull.push(point);
+	}
+ 
+	return hull;
+ }
+ 
+ // Основная функция для построения выпуклой оболочки вокруг каждой точки
+ function buildAllConvexHulls(points: Node[]): Node[][] {
+	const result: Node[][] = [];
+ 
+	for (const point of points) {
+	  // Исключаем текущую точку из списка
+	  const otherPoints = points.filter(p => p.id !== point.id);
+	  const hull = buildConvexHull(otherPoints);
+ 
+	  // Добавляем текущую точку в начало массива
+	  result.push([point, ...hull]);
+	}
+ 
+	return result;
+ }
+//============================================================
+const hull =  buildAllConvexHulls(finalNodes)
+
+hull.forEach((arr) => {
+	arr.forEach(a => {
+		a.group = 5
+	})
+})
+hull.forEach(arr => {
+	arr.forEach(a => {
+		nodes.forEach(node => {
+		if (a.id === node.id) {
+			node.group = 5
+		}
+	})
+	})
+	
+})
+//=============================================================
 console.log(finalNodes)
+console.log(hull)
 
 	return { nodes, links }
 }
