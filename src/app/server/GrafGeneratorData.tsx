@@ -1,4 +1,6 @@
-import { index, randomLcg } from "d3";
+import * as d3 from 'd3';
+import {Delaunay} from "d3-delaunay";
+import Point = Delaunay.Point;
 
 export interface Node {
   id: string;
@@ -29,6 +31,44 @@ function doLinesIntersect(a: Node, b: Node, c: Node, d: Node): boolean {
     return (p3.y - p1.y) * (p2.x - p1.x) > (p2.y - p1.y) * (p3.x - p1.x);
   }
   return ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d);
+}
+
+export function smallestConvexHullAroundPoint(delaunay: d3.Delaunay<Delaunay.Point>, nodes: Node[], givenPoint: Node): Node[] {
+  // Extract points from nodes
+  const points = nodes.map(node => [node.x, node.y] satisfies Point);
+  // const voronoi = delaunay.voronoi([0, 0, 1, 1]);
+
+  // Find the nearest point to the given point
+  const nearestIndex = delaunay.find(givenPoint.x, givenPoint.y);
+
+  // Get the neighbors of the nearest point
+  const neighbors = new Set<number>();
+  // Loop through the triangles
+  for (let i = 0; i < delaunay.triangles.length; i += 3) {
+    if (delaunay.triangles[i] === nearestIndex || delaunay.triangles[i + 1] === nearestIndex || delaunay.triangles[i + 2] === nearestIndex) {
+      // If the triangle contains the nearest point, add its vertices to the neighbors set
+      neighbors.add(delaunay.triangles[i]);
+      neighbors.add(delaunay.triangles[i + 1]);
+      neighbors.add(delaunay.triangles[i + 2]);
+    }
+  }
+  // Remove the nearest point itself from the set
+  neighbors.delete(nearestIndex);
+
+  // Convert the neighbor indices back to points
+  const neighborPoints: [number, number][] = [];
+  neighbors.forEach(index => {
+    neighborPoints.push(points[index]);
+  });
+
+  // TODO: Do this only if we decide that we need a convex hull
+  // Compute the convex hull of the neighbor points
+  // const hull = d3.polygonHull(neighborPoints);
+
+  // Map the hull points back to the original nodes
+  const hullNodes = neighborPoints?.map(([hx, hy]) => nodes.find(node => node.x === hx && node.y === hy)!);
+
+  return hullNodes || [];
 }
 
 // Изменение нулевой точки
@@ -87,7 +127,6 @@ export function findFurthestNodes(
 // Функция для нахождения третьей точки по принципу наименьшего угла среди ближайших точек
 export function findThirdNode(
   nodes: Node[],
-  finalNodes: Node[],
   node1: Node,
   node2: Node,
   nearestCount: number,
@@ -96,27 +135,101 @@ export function findThirdNode(
   let minAngle = Infinity;
   let thirdNode: Node | null = null;
 
-  for (const node of nearestNodes) {
-    finalNodes.forEach((finalNode) => {
-      if (
-        node.id !== node1.id &&
-        node.id !== node2.id &&
-        node.id !== finalNode.id
-      ) {
-        const angle = angleBetweenVectors(node1, node2, node);
-        const v1 = changeVectorZeroPoint(node1, node2);
-        const v2 = changeVectorZeroPoint(node2, node);
-        const crossProduct = v1.x * v2.y - v1.y * v2.x;
+  for (const node of nearestNodes.filter(n => ![node1.id, node2.id].includes(n.id))) {
+    const angle = angleBetweenVectors(node1, node2, node);
+    const v1 = changeVectorZeroPoint(node1, node2);
+    const v2 = changeVectorZeroPoint(node2, node);
+    const crossProduct = v1.x * v2.y - v1.y * v2.x;
 
-        if (crossProduct < 0 && angle < minAngle) {
-          minAngle = angle;
-          thirdNode = node;
-        }
-      }
-    });
+    if (crossProduct < 0 && angle < minAngle) {
+      minAngle = angle;
+      thirdNode = node;
+    }
   }
 
   return thirdNode;
+}
+
+export function getFinalNodes(nodes: Node[], links: Link[]) {
+  const linesNodes: string[] = [];
+
+  links.forEach((link) => {
+    linesNodes.push(link.source, link.target);
+  });
+
+  const finalNodesListId: string[] = linesNodes.filter(
+    (node) => linesNodes.indexOf(node) === linesNodes.lastIndexOf(node),
+  );
+
+  const finalNodes: Node[] = [];
+  finalNodesListId.forEach((finalNode) => {
+    nodes.forEach((node) => {
+      if (finalNode === node.id) {
+        finalNodes.push({
+          id: node.id,
+          group: node.group,
+          x: node.x,
+          y: node.y,
+        });
+      }
+    });
+  });
+
+  return finalNodes;
+}
+
+export function nodeIsNotFinal(node: Node, nodes: Node[], links: Link[]): boolean {
+  return !getFinalNodes(nodes, links).map(n => n.id).includes(node.id);
+}
+
+export function getConvexHull(nodes: Node[], links: Link[], centroid: Node) {
+  let hull: Node[] = [];
+  const nonFinalNodes = nodes.filter(n => nodeIsNotFinal(n, nodes, links));
+
+  let nodes1: Node = centroid;
+  let nodes2: Node = findNearestNodes(nodes, nodes1, 20)[0];
+  let nodes3: Node | null = findThirdNode(
+    nonFinalNodes,
+    nodes1,
+    nodes2,
+    30,
+  );
+
+  let endNode = nodes2;
+
+  if (nodes3 !== null) {
+    const hullSegment: Node[] = [nodes2, nodes3];
+    const maxIterations = 100;
+    let iterations = 0;
+
+    while (iterations < maxIterations) {
+      nodes1 = nodes2;
+      nodes2 = nodes3;
+      nodes3 = findThirdNode(nonFinalNodes.filter(n => !hull.map(n => n.id).includes(n.id) && n.id !== centroid.id), nodes1, nodes2, 30);
+
+      if (nodes3 !== null) {
+        if (nodes3.id === endNode.id) {
+          hullSegment.push(nodes3); // Замыкаем оболочку
+          break;
+        }
+        if (hullSegment.includes(nodes3)) {
+          break; // Прерываем цикл, если узел уже присутствует в сегменте оболочки
+        }
+        hullSegment.push(nodes3);
+      } else {
+        break; // Прерываем цикл, если не найден nodes3
+      }
+
+      iterations++;
+    }
+
+    hull = [...hull, ...hullSegment]
+  } else {
+    // Если не найден nodes3, добавляем только nodes1 и nodes2, чтобы сохранить структуру
+    hull= [...hull, nodes1, nodes2]
+  }
+
+  return hull.slice(0, 3);
 }
 
 //============================================================================================================================
@@ -132,7 +245,7 @@ export function GrafGeneratorData(
 } {
   const width = widthFieldSize;
   const height = heightFieldSize;
-  let random = randomLcg(randomSeed);
+  let random = d3.randomLcg(randomSeed);
 
   const nodes: Node[] = [];
 
@@ -248,81 +361,6 @@ export function GrafGeneratorData(
     }
   });
 
-  function findFinalNodes(): string[] {
-    const linesNodes: string[] = [];
-
-    links.forEach((link) => {
-      linesNodes.push(link.source, link.target);
-    });
-    return linesNodes.filter(
-      (node) => linesNodes.indexOf(node) === linesNodes.lastIndexOf(node),
-    );
-  }
-
-  const finalNodesListId: string[] = findFinalNodes();
-
-  const finalNodes: Node[] = [];
-
-  finalNodesListId.forEach((finalNode) => {
-    nodes.forEach((node) => {
-      if (finalNode === node.id) {
-        finalNodes.push({
-          id: node.id,
-          group: node.group,
-          x: node.x,
-          y: node.y,
-        });
-      }
-    });
-  });
-
-  const hull: Node[][] = [];
-
-  finalNodes.forEach((finalNode) => {
-    let nodes1: Node = finalNode;
-    let nodes2: Node = findNearestNodes(nodes, nodes1, 20)[0];
-    let nodes3: Node | null = findThirdNode(
-      nodes,
-      finalNodes,
-      nodes1,
-      nodes2,
-      30,
-    );
-    let endNode = nodes2;
-
-    if (nodes3 !== null) {
-      const hullSegment: Node[] = [nodes1, nodes2, nodes3];
-      const maxIterations = 100;
-      let iterations = 0;
-
-      while (iterations < maxIterations) {
-        nodes1 = nodes2;
-        nodes2 = nodes3;
-        nodes3 = findThirdNode(nodes, finalNodes, nodes1, nodes2, 30);
-
-        if (nodes3 !== null) {
-          if (nodes3.id === endNode.id) {
-            hullSegment.push(nodes3); // Замыкаем оболочку
-            break;
-          }
-          if (hullSegment.includes(nodes3)) {
-            break; // Прерываем цикл, если узел уже присутствует в сегменте оболочки
-          }
-          hullSegment.push(nodes3);
-        } else {
-          break; // Прерываем цикл, если не найден nodes3
-        }
-
-        iterations++;
-      }
-
-      hull.push(hullSegment);
-    } else {
-      // Если не найден nodes3, добавляем только nodes1 и nodes2, чтобы сохранить структуру
-      hull.push([nodes1, nodes2]);
-    }
-  });
-
   //finalNodes.forEach((finalNode, index) => {
   //  if (index < hull.length) {
   //    let targetNode = findFurthestNodes(hull[index], finalNode, 1)[0];
@@ -354,9 +392,6 @@ export function GrafGeneratorData(
   //    }
   //  }
   //});
-
-  console.log(finalNodes);
-  console.log(hull);
 
   return { nodes, links };
 }
