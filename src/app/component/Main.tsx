@@ -1,9 +1,14 @@
 "use client";
 
 import * as d3 from "d3";
-import {useEffect, useMemo, useRef, useState} from "react";
-import {Node, Link, GrafGeneratorData, getConvexHull, smallestConvexHullAroundPoint} from "../server/GrafGeneratorData";
-import {Delaunay} from "d3";
+import { useEffect, useMemo, useRef /*, useState*/ } from "react";
+import {
+  Node,
+  Link,
+  GrafGeneratorData,
+  //smallestConvexHullAroundPoint,
+} from "../server/GrafGeneratorData";
+import { Delaunay } from "d3";
 import Point = Delaunay.Point;
 
 interface MainProps {
@@ -11,6 +16,7 @@ interface MainProps {
   heightFieldSize: number;
   amountPoints: number;
   randomSeed: number;
+  connectionControl: number;
 }
 
 interface GrafData {
@@ -23,20 +29,32 @@ export default function Main({
   heightFieldSize,
   amountPoints,
   randomSeed,
+  connectionControl,
 }: MainProps) {
   const d3Container = useRef<SVGSVGElement>(null);
-  const { nodes, links }: GrafData = useMemo(() => GrafGeneratorData(
-    amountPoints,
-    randomSeed,
-    widthFieldSize,
-    heightFieldSize,
-  ), [amountPoints, randomSeed, widthFieldSize, heightFieldSize]);
+  const { nodes, links }: GrafData = useMemo(
+    () =>
+      GrafGeneratorData(
+        amountPoints,
+        randomSeed,
+        widthFieldSize,
+        heightFieldSize,
+        connectionControl,
+      ),
+    [
+      amountPoints,
+      randomSeed,
+      widthFieldSize,
+      heightFieldSize,
+      connectionControl,
+    ],
+  );
 
-  const [hull, setHull] = useState<Node[] | undefined>();
+  //const [hull /*, setHull*/] = useState<Node[] | undefined>();
   const delaunay = useMemo(() => {
-    const points = nodes.map(node => [node.x, node.y] satisfies Point);
+    const points = nodes.map((node) => [node.x, node.y] satisfies Point);
     return d3.Delaunay.from(points);
-  }, [amountPoints, randomSeed, widthFieldSize, heightFieldSize]);
+  }, [nodes]);
 
   useEffect(() => {
     if (!d3Container.current) return;
@@ -54,16 +72,16 @@ export default function Main({
         .attr("cx", (d) => d.x || 0)
         .attr("cy", (d) => d.y || 0)
         .attr("r", 5)
-        .attr("style", "cursor: pointer;")
+        //.attr("style", "cursor: pointer;")
         .attr("fill", (d) => {
-          if (hull?.map(n => n.id).includes(d.id)) {
-            return '#ff0000';
-          }
+          //if (hull?.map((n) => n.id).includes(d.id)) {
+          //  return "#ff0000";
+          //}
           return d3.schemeCategory10[d.group];
-        })
-        .on("click", (event, node) => {
-          setHull(smallestConvexHullAroundPoint(delaunay, nodes, node));
         });
+      //.on("click", (event, node) => {
+      //  setHull(smallestConvexHullAroundPoint(delaunay, nodes, node));
+      //});
 
       // Рисуем линии для связей
       svg
@@ -77,7 +95,16 @@ export default function Main({
         .attr("y2", (d) => nodes.find((node) => node.id === d.target)?.y || 0)
         .attr("stroke", "black");
     }
-  }, [amountPoints, heightFieldSize, links, nodes, widthFieldSize, hull, delaunay]);
+  }, [
+    amountPoints,
+    heightFieldSize,
+    links,
+    nodes,
+    widthFieldSize,
+    //hull,
+    delaunay,
+  ]);
+  console.log(connectionControl);
 
   return (
     <main className="container mx-auto">

@@ -9,14 +9,20 @@ export default function StartPage() {
   const [heightFieldSize, setHeightFieldSize] = useState<number>(0);
   const [amountPoints, setAmountPoints] = useState<number>(0);
   const [randomSeed, setRandomSeed] = useState<number>(0);
+  const [connectionControl, setConnectionControl] = useState<number>(0);
 
   function getFieldSizes(fieldWidth: number, fieldHeight: number) {
     setWidthFieldSize(fieldWidth);
     setHeightFieldSize(fieldHeight);
   }
-  function getDataUser(amountPoints: number, randomSeed: number) {
+  function getDataUser(
+    amountPoints: number,
+    randomSeed: number,
+    connectionControl: number,
+  ) {
     setAmountPoints(amountPoints);
     setRandomSeed(randomSeed);
+    setConnectionControl(connectionControl);
   }
 
   return (
@@ -27,6 +33,7 @@ export default function StartPage() {
         randomSeed={randomSeed}
         widthFieldSize={widthFieldSize}
         heightFieldSize={heightFieldSize}
+        connectionControl={connectionControl}
       />
     </>
   );

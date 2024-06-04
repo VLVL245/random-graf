@@ -5,7 +5,11 @@ import { Button, Input, Link } from "@nextui-org/react";
 
 interface GetField {
   getFieldSizes: (fieldSizesX: number, fieldSizesY: number) => void;
-  getDataUser: (amountPoints: number, randomSeed: number) => void;
+  getDataUser: (
+    amountPoints: number,
+    randomSeed: number,
+    connectionControl: number,
+  ) => void;
 }
 
 export default function Header({ getFieldSizes, getDataUser }: GetField) {
@@ -15,10 +19,15 @@ export default function Header({ getFieldSizes, getDataUser }: GetField) {
   const [screenSizeX, setScreenSizeX] = useState<number>(0);
   const [screenSizeY, setScreenSizeY] = useState<number>(0);
   const [randomSeed, setRandomSeed] = useState<string>("");
+  const [connectionControl, setConnectionControl] = useState<string>("0");
 
   function sendData() {
     getFieldSizes(Number(fieldSizesX), Number(fieldSizesY));
-    getDataUser(Number(amountPoints), Number(randomSeed));
+    getDataUser(
+      Number(amountPoints),
+      Number(randomSeed),
+      Number(connectionControl),
+    );
   }
 
   const validForm = useMemo(() => {
@@ -26,9 +35,11 @@ export default function Header({ getFieldSizes, getDataUser }: GetField) {
     if (Number(fieldSizesX) <= 0 || fieldSizesX === "") return true;
     if (Number(fieldSizesY) <= 0 || fieldSizesY === "") return true;
     if (Number(randomSeed) <= 0 || randomSeed === "") return true;
+    if (Number(connectionControl) < 0 || Number(connectionControl) > 100)
+      return true;
 
     return false;
-  }, [amountPoints, fieldSizesX, fieldSizesY, randomSeed]);
+  }, [amountPoints, fieldSizesX, fieldSizesY, randomSeed, connectionControl]);
 
   useEffect(() => {
     setScreenSizeX(window.innerWidth);
@@ -92,6 +103,24 @@ export default function Header({ getFieldSizes, getDataUser }: GetField) {
             type="number"
             label="Random seed"
             errorMessage="The number must be greater than 0"
+            className="max-w-xs"
+          />
+        </div>
+        <div>
+          <Input
+            isRequired
+            isInvalid={
+              Number(connectionControl) < 0 || Number(connectionControl) > 100
+                ? true
+                : false
+            }
+            value={connectionControl}
+            onChange={(e) => setConnectionControl(e.target.value)}
+            type="number"
+            step={10}
+            label="Connection control"
+            description="From 0 to 100"
+            errorMessage="The number must be greater than 0 or 0 but not greater than 100"
             className="max-w-xs"
           />
         </div>

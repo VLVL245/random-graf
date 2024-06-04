@@ -1,6 +1,7 @@
-import * as d3 from 'd3';
-import {Delaunay} from "d3-delaunay";
+import * as d3 from "d3";
+import { Delaunay } from "d3-delaunay";
 import Point = Delaunay.Point;
+import { sources } from "next/dist/compiled/webpack/webpack";
 
 export interface Node {
   id: string;
@@ -20,8 +21,14 @@ export interface Link {
   value: number;
 }
 
+export interface PotentialLinks {
+  source: Node;
+  target: Node;
+  dist: number;
+}
+
 // Функция вычисляет евклидово расстояние между двумя узлами
-function distance(nodeA: Node, nodeB: Node): number {
+export function distance(nodeA: Node, nodeB: Node): number {
   return Math.sqrt((nodeA.x - nodeB.x) ** 2 + (nodeA.y - nodeB.y) ** 2);
 }
 
@@ -33,84 +40,110 @@ function doLinesIntersect(a: Node, b: Node, c: Node, d: Node): boolean {
   return ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d);
 }
 
-export function smallestConvexHullAroundPoint(delaunay: d3.Delaunay<Delaunay.Point>, nodes: Node[], givenPoint: Node): Node[] {
-  // Extract points from nodes
-  const points = nodes.map(node => [node.x, node.y] satisfies Point);
-  // const voronoi = delaunay.voronoi([0, 0, 1, 1]);
+// Алгоритм Краскала для создания минимального остовного дерева
+function kruskal(
+  nodes: Node[],
+  potentialLinks: PotentialLinks[],
+  links: Link[],
+) {
+  const parent = new Map<string, string>();
 
-  // Find the nearest point to the given point
-  const nearestIndex = delaunay.find(givenPoint.x, givenPoint.y);
+  function find(node: string): string {
+    if (parent.get(node) !== node) {
+      parent.set(node, find(parent.get(node)!));
+    }
+    return parent.get(node)!;
+  }
 
-  // Get the neighbors of the nearest point
-  const neighbors = new Set<number>();
-  // Loop through the triangles
-  for (let i = 0; i < delaunay.triangles.length; i += 3) {
-    if (delaunay.triangles[i] === nearestIndex || delaunay.triangles[i + 1] === nearestIndex || delaunay.triangles[i + 2] === nearestIndex) {
-      // If the triangle contains the nearest point, add its vertices to the neighbors set
-      neighbors.add(delaunay.triangles[i]);
-      neighbors.add(delaunay.triangles[i + 1]);
-      neighbors.add(delaunay.triangles[i + 2]);
+  function union(nodeA: string, nodeB: string) {
+    const rootA = find(nodeA);
+    const rootB = find(nodeB);
+    if (rootA !== rootB) {
+      parent.set(rootA, rootB);
     }
   }
-  // Remove the nearest point itself from the set
-  neighbors.delete(nearestIndex);
 
-  // Convert the neighbor indices back to points
-  const neighborPoints: [number, number][] = [];
-  neighbors.forEach(index => {
-    neighborPoints.push(points[index]);
+  nodes.forEach((node) => parent.set(node.id, node.id));
+
+  potentialLinks.forEach((linkInfo) => {
+    const rootSource = find(linkInfo.source.id);
+    const rootTarget = find(linkInfo.target.id);
+
+    if (rootSource !== rootTarget) {
+      let intersects = links.some((link) => {
+        const sourceNode = nodes.find((n) => n.id === link.source);
+        const targetNode = nodes.find((n) => n.id === link.target);
+        return (
+          sourceNode &&
+          targetNode &&
+          doLinesIntersect(
+            linkInfo.source,
+            linkInfo.target,
+            sourceNode,
+            targetNode,
+          )
+        );
+      });
+
+      if (!intersects) {
+        links.push({
+          source: linkInfo.source.id,
+          target: linkInfo.target.id,
+          value: 0.8,
+        });
+        union(linkInfo.source.id, linkInfo.target.id);
+      }
+    }
   });
-
-  // TODO: Do this only if we decide that we need a convex hull
-  // Compute the convex hull of the neighbor points
-  // const hull = d3.polygonHull(neighborPoints);
-
-  // Map the hull points back to the original nodes
-  const hullNodes = neighborPoints?.map(([hx, hy]) => nodes.find(node => node.x === hx && node.y === hy)!);
-
-  return hullNodes || [];
 }
 
-// Изменение нулевой точки
-export function changeVectorZeroPoint(
-  vector: Vector2,
-  newZero: Vector2,
-): Vector2 {
-  return { x: vector.x - newZero.x, y: vector.y - newZero.y };
-}
-//================================================================
-export function getDotProduct(v1: Vector2, v2: Vector2) {
-  return v1.x * v2.x + v1.y * v2.y;
-}
-
-export function getMagnitude(vector: Vector2) {
-  return Math.sqrt(Math.pow(vector.x, 2) + Math.pow(vector.y, 2));
-}
-
-export function getDegreeFromRadian(radian: number) {
-  return radian * (180 / Math.PI);
-}
-
-// Функция для вычисления угла между двумя векторами
-export function angleBetweenVectors(n1: Node, n2: Node, n3: Node): number {
-  const v1 = changeVectorZeroPoint(n1, n2);
-  const v2 = changeVectorZeroPoint(n3, n2);
-  return Math.acos(
-    getDotProduct(v1, v2) / (getMagnitude(v1) * getMagnitude(v2)),
-  );
-}
-//================================================================
-
-// Функция для нахождения ближайших точек
-export function findNearestNodes(
+export function smallestConvexHullAroundPoint(
+  delaunay: d3.Delaunay<Delaunay.Point>,
   nodes: Node[],
-  nodeA: Node,
-  nearestCount: number,
-): Node[] {
-  return nodes
-    .filter((node) => node.id !== nodeA.id)
-    .sort((a, b) => distance(nodeA, a) - distance(nodeA, b))
-    .slice(0, nearestCount);
+  givenPoints: Node[],
+): Node[][] {
+  // Извлечение точек из узлов
+  const points = nodes.map((node) => [node.x, node.y] satisfies Point);
+
+  // Найти ближайшую точку к заданной точке
+  return givenPoints.map((givenPoint) => {
+    const nearestIndex = delaunay.find(givenPoint.x, givenPoint.y);
+
+    // Получить соседей ближайшей точки
+    const neighbors = new Set<number>();
+    // Перебираем треугольники
+    for (let i = 0; i < delaunay.triangles.length; i += 3) {
+      if (
+        delaunay.triangles[i] === nearestIndex ||
+        delaunay.triangles[i + 1] === nearestIndex ||
+        delaunay.triangles[i + 2] === nearestIndex
+      ) {
+        // Если треугольник содержит ближайшую точку, добавьте его вершины в набор соседей
+        neighbors.add(delaunay.triangles[i]);
+        neighbors.add(delaunay.triangles[i + 1]);
+        neighbors.add(delaunay.triangles[i + 2]);
+      }
+    }
+    // Удалить саму ближайшую точку из набора
+    neighbors.delete(nearestIndex);
+
+    // Преобразуйте индексы соседей обратно в точки
+    const neighborPoints: [number, number][] = [];
+    neighbors.forEach((index) => {
+      neighborPoints.push(points[index]);
+    });
+
+    // TODO: Делайте это только в том случае, если мы решим, что нам нужна выпуклая оболочка.
+    // Вычислить выпуклую оболочку соседних точек
+    // const hull = d3.polygonHull(neighborPoints);
+
+    // Сопоставьте точки корпуса с исходными узлами
+    const hullNodes = neighborPoints?.map(
+      ([hx, hy]) => nodes.find((node) => node.x === hx && node.y === hy)!,
+    );
+
+    return hullNodes || [];
+  });
 }
 
 export function findFurthestNodes(
@@ -122,32 +155,6 @@ export function findFurthestNodes(
     .filter((node) => node.id !== nodeA.id)
     .sort((a, b) => distance(b, nodeA) - distance(a, nodeA))
     .slice(0, furthestCount);
-}
-
-// Функция для нахождения третьей точки по принципу наименьшего угла среди ближайших точек
-export function findThirdNode(
-  nodes: Node[],
-  node1: Node,
-  node2: Node,
-  nearestCount: number,
-): Node | null {
-  const nearestNodes = findNearestNodes(nodes, node2, nearestCount);
-  let minAngle = Infinity;
-  let thirdNode: Node | null = null;
-
-  for (const node of nearestNodes.filter(n => ![node1.id, node2.id].includes(n.id))) {
-    const angle = angleBetweenVectors(node1, node2, node);
-    const v1 = changeVectorZeroPoint(node1, node2);
-    const v2 = changeVectorZeroPoint(node2, node);
-    const crossProduct = v1.x * v2.y - v1.y * v2.x;
-
-    if (crossProduct < 0 && angle < minAngle) {
-      minAngle = angle;
-      thirdNode = node;
-    }
-  }
-
-  return thirdNode;
 }
 
 export function getFinalNodes(nodes: Node[], links: Link[]) {
@@ -178,60 +185,6 @@ export function getFinalNodes(nodes: Node[], links: Link[]) {
   return finalNodes;
 }
 
-export function nodeIsNotFinal(node: Node, nodes: Node[], links: Link[]): boolean {
-  return !getFinalNodes(nodes, links).map(n => n.id).includes(node.id);
-}
-
-export function getConvexHull(nodes: Node[], links: Link[], centroid: Node) {
-  let hull: Node[] = [];
-  const nonFinalNodes = nodes.filter(n => nodeIsNotFinal(n, nodes, links));
-
-  let nodes1: Node = centroid;
-  let nodes2: Node = findNearestNodes(nodes, nodes1, 20)[0];
-  let nodes3: Node | null = findThirdNode(
-    nonFinalNodes,
-    nodes1,
-    nodes2,
-    30,
-  );
-
-  let endNode = nodes2;
-
-  if (nodes3 !== null) {
-    const hullSegment: Node[] = [nodes2, nodes3];
-    const maxIterations = 100;
-    let iterations = 0;
-
-    while (iterations < maxIterations) {
-      nodes1 = nodes2;
-      nodes2 = nodes3;
-      nodes3 = findThirdNode(nonFinalNodes.filter(n => !hull.map(n => n.id).includes(n.id) && n.id !== centroid.id), nodes1, nodes2, 30);
-
-      if (nodes3 !== null) {
-        if (nodes3.id === endNode.id) {
-          hullSegment.push(nodes3); // Замыкаем оболочку
-          break;
-        }
-        if (hullSegment.includes(nodes3)) {
-          break; // Прерываем цикл, если узел уже присутствует в сегменте оболочки
-        }
-        hullSegment.push(nodes3);
-      } else {
-        break; // Прерываем цикл, если не найден nodes3
-      }
-
-      iterations++;
-    }
-
-    hull = [...hull, ...hullSegment]
-  } else {
-    // Если не найден nodes3, добавляем только nodes1 и nodes2, чтобы сохранить структуру
-    hull= [...hull, nodes1, nodes2]
-  }
-
-  return hull.slice(0, 3);
-}
-
 //============================================================================================================================
 
 export function GrafGeneratorData(
@@ -239,6 +192,7 @@ export function GrafGeneratorData(
   randomSeed: number,
   widthFieldSize: number,
   heightFieldSize: number,
+  connectionControl: number,
 ): {
   nodes: Node[];
   links: Link[];
@@ -282,7 +236,7 @@ export function GrafGeneratorData(
 
   const links: Link[] = [];
 
-  let potentialLinks: { source: Node; target: Node; dist: number }[] = [];
+  let potentialLinks: PotentialLinks[] = [];
   nodes.forEach((nodeA, indexA) => {
     nodes.forEach((nodeB, indexB) => {
       if (indexA !== indexB) {
@@ -296,61 +250,8 @@ export function GrafGeneratorData(
   });
   potentialLinks.sort((a, b) => a.dist - b.dist);
 
-  // Алгоритм Краскала для создания минимального остовного дерева
-  function kruskal() {
-    const parent = new Map<string, string>();
-
-    function find(node: string): string {
-      if (parent.get(node) !== node) {
-        parent.set(node, find(parent.get(node)!));
-      }
-      return parent.get(node)!;
-    }
-
-    function union(nodeA: string, nodeB: string) {
-      const rootA = find(nodeA);
-      const rootB = find(nodeB);
-      if (rootA !== rootB) {
-        parent.set(rootA, rootB);
-      }
-    }
-
-    nodes.forEach((node) => parent.set(node.id, node.id));
-
-    potentialLinks.forEach((linkInfo) => {
-      const rootSource = find(linkInfo.source.id);
-      const rootTarget = find(linkInfo.target.id);
-
-      if (rootSource !== rootTarget) {
-        let intersects = links.some((link) => {
-          const sourceNode = nodes.find((n) => n.id === link.source);
-          const targetNode = nodes.find((n) => n.id === link.target);
-          return (
-            sourceNode &&
-            targetNode &&
-            doLinesIntersect(
-              linkInfo.source,
-              linkInfo.target,
-              sourceNode,
-              targetNode,
-            )
-          );
-        });
-
-        if (!intersects) {
-          links.push({
-            source: linkInfo.source.id,
-            target: linkInfo.target.id,
-            value: 0.8,
-          });
-          union(linkInfo.source.id, linkInfo.target.id);
-        }
-      }
-    });
-  }
-
   // Создаем связи с использованием алгоритма Краскала
-  kruskal();
+  kruskal(nodes, potentialLinks, links);
 
   nodes.forEach((node) => {
     let foundLink = links.find(
@@ -360,38 +261,40 @@ export function GrafGeneratorData(
       node.group = 3;
     }
   });
+  const finalNodes: Node[] = getFinalNodes(nodes, links);
+  const points = nodes.map((node) => [node.x, node.y] satisfies Point);
+  const delaunay = d3.Delaunay.from(points);
 
-  //finalNodes.forEach((finalNode, index) => {
-  //  if (index < hull.length) {
-  //    let targetNode = findFurthestNodes(hull[index], finalNode, 1)[0];
-  //    if (targetNode) {
-  //      // Проверяем, пересекает ли новая линия уже существующие линии
-  //      let intersects = links.some((link) => {
-  //        const sourceNode = nodes.find((n) => n.id === link.source);
-  //        const targetNodeExisting = nodes.find((n) => n.id === link.target);
-  //        return (
-  //          sourceNode &&
-  //          targetNodeExisting &&
-  //          doLinesIntersect(
-  //            finalNode,
-  //            targetNode,
-  //            sourceNode,
-  //            targetNodeExisting,
-  //          )
-  //        );
-  //      });
-  //
-  //      // Добавляем линию, только если она не пересекает другие линии
-  //      if (!intersects) {
-  //        links.push({
-  //          source: finalNode.id,
-  //          target: targetNode.id,
-  //          value: 0.8,
-  //        });
-  //      }
-  //    }
-  //  }
-  //});
+  const hulls: Node[][] = smallestConvexHullAroundPoint(
+    delaunay,
+    nodes,
+    finalNodes,
+  );
 
+  const maxDistance = 300;
+  const lengthFinalNodePercentage = Math.round(100 / finalNodes.length);
+  const maxIterationFinalNodes = connectionControl / lengthFinalNodePercentage;
+
+  for (let i = 0; i < finalNodes.length; i++) {
+    if (i >= maxIterationFinalNodes) break;
+
+    const finalNode = finalNodes[i];
+    let furthestNodes = findFurthestNodes(hulls[i], finalNode, 20);
+    let targetNode = furthestNodes.find(
+      (node) =>
+        !finalNodes.some((fn) => fn.id === node.id) &&
+        distance(finalNode, node) <= maxDistance,
+    );
+
+    if (targetNode) {
+      links.push({
+        source: finalNode.id,
+        target: targetNode.id,
+        value: 0.8,
+      });
+    }
+  }
+
+  console.log(maxIterationFinalNodes);
   return { nodes, links };
 }

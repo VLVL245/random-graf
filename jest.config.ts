@@ -12,6 +12,8 @@ const config: Config = {
   testEnvironment: "jsdom",
   moduleNameMapper: {
     "^d3$": "<rootDir>/node_modules/d3/dist/d3.min.js",
+    "^d3-delaunay$":
+      "<rootDir>/node_modules/d3-delaunay/dist/d3-delaunay.min.js",
   },
 
   // Add more setup options before each test is run
