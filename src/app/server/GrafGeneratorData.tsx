@@ -273,7 +273,12 @@ export function GrafGeneratorData(
     const finalNode = finalNodes[i];
     let furthestNodes = findFurthestNodes(hull, finalNode, 20);
     let targetNode = furthestNodes.find(
-      (node) => !finalNodes.some((fn) => fn.id === node.id), //&&
+      (node) =>
+        !finalNodes.some((fn) => fn.id === node.id) &&
+        finalNode.x >= 50 &&
+        finalNode.y >= 50 &&
+        finalNode.x <= width - 50 &&
+        finalNode.y <= height - 50,
       // distance(finalNode, node) <= maxDistance,
     );
 
