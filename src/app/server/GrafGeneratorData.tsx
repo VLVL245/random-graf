@@ -191,6 +191,8 @@ export function GrafGeneratorData(
   widthFieldSize: number,
   heightFieldSize: number,
   connectionControl: number,
+  workspacePaddingX: number,
+  workspacePaddingY: number,
 ): {
   nodes: Node[];
   links: Link[];
@@ -263,7 +265,7 @@ export function GrafGeneratorData(
   const points = nodes.map((node) => [node.x, node.y] satisfies Point);
   const delaunay = d3.Delaunay.from(points);
 
-  const maxDistance = 300;
+  //const maxDistance = 300;
   const lengthFinalNodePercentage = Math.round(100 / finalNodes.length);
   const maxIterationFinalNodes = connectionControl / lengthFinalNodePercentage;
 
@@ -275,10 +277,10 @@ export function GrafGeneratorData(
     let targetNode = furthestNodes.find(
       (node) =>
         !finalNodes.some((fn) => fn.id === node.id) &&
-        finalNode.x >= 50 &&
-        finalNode.y >= 50 &&
-        finalNode.x <= width - 50 &&
-        finalNode.y <= height - 50,
+        finalNode.x >= workspacePaddingX &&
+        finalNode.y >= workspacePaddingY &&
+        finalNode.x <= width - workspacePaddingX &&
+        finalNode.y <= height - workspacePaddingY,
       // distance(finalNode, node) <= maxDistance,
     );
 

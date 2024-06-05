@@ -10,7 +10,7 @@ import {
 } from "../server/GrafGeneratorData";
 import { Delaunay } from "d3";
 import Point = Delaunay.Point;
-import { schemeDark2 } from "d3-scale-chromatic";
+//import { schemeDark2 } from "d3-scale-chromatic";
 
 interface MainProps {
   widthFieldSize: number;
@@ -18,6 +18,8 @@ interface MainProps {
   amountPoints: number;
   randomSeed: number;
   connectionControl: number;
+  workspacePaddingX: number;
+  workspacePaddingY: number;
 }
 
 interface GrafData {
@@ -31,6 +33,8 @@ export default function Main({
   amountPoints,
   randomSeed,
   connectionControl,
+  workspacePaddingX,
+  workspacePaddingY,
 }: MainProps) {
   const d3Container = useRef<SVGSVGElement>(null);
   const { nodes, links }: GrafData = useMemo(
@@ -41,6 +45,8 @@ export default function Main({
         widthFieldSize,
         heightFieldSize,
         connectionControl,
+        workspacePaddingX,
+        workspacePaddingY,
       ),
     [
       amountPoints,
@@ -48,6 +54,8 @@ export default function Main({
       widthFieldSize,
       heightFieldSize,
       connectionControl,
+      workspacePaddingX,
+      workspacePaddingY,
     ],
   );
 

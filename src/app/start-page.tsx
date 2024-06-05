@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Header from "./component/Header";
+//import Header from "./component/Header";
 import Main from "./component/Main";
 import { useControls } from "leva";
 
@@ -12,6 +12,8 @@ export default function StartPage() {
     widthFieldSize,
     heightFieldSize,
     connectionControl,
+    workspacePaddingX,
+    workspacePaddingY,
   } = useControls({
     amountPoints: {
       value: 100,
@@ -40,6 +42,18 @@ export default function StartPage() {
       max: 100,
       step: 1,
     },
+    workspacePaddingX: {
+      value: 50,
+      min: 0,
+      max: 200,
+      step: 1,
+    },
+    workspacePaddingY: {
+      value: 50,
+      min: 0,
+      max: 200,
+      step: 1,
+    },
   });
 
   return (
@@ -50,6 +64,8 @@ export default function StartPage() {
         widthFieldSize={widthFieldSize}
         heightFieldSize={heightFieldSize}
         connectionControl={connectionControl}
+        workspacePaddingX={workspacePaddingX}
+        workspacePaddingY={workspacePaddingY}
       />
     </>
   );
