@@ -100,50 +100,48 @@ function kruskal(
 export function smallestConvexHullAroundPoint(
   delaunay: d3.Delaunay<Delaunay.Point>,
   nodes: Node[],
-  givenPoints: Node[],
-): Node[][] {
+  centroid: Node,
+): Node[] {
   // Извлечение точек из узлов
   const points = nodes.map((node) => [node.x, node.y] satisfies Point);
 
   // Найти ближайшую точку к заданной точке
-  return givenPoints.map((givenPoint) => {
-    const nearestIndex = delaunay.find(givenPoint.x, givenPoint.y);
+  const nearestIndex = delaunay.find(centroid.x, centroid.y);
 
-    // Получить соседей ближайшей точки
-    const neighbors = new Set<number>();
-    // Перебираем треугольники
-    for (let i = 0; i < delaunay.triangles.length; i += 3) {
-      if (
-        delaunay.triangles[i] === nearestIndex ||
-        delaunay.triangles[i + 1] === nearestIndex ||
-        delaunay.triangles[i + 2] === nearestIndex
-      ) {
-        // Если треугольник содержит ближайшую точку, добавьте его вершины в набор соседей
-        neighbors.add(delaunay.triangles[i]);
-        neighbors.add(delaunay.triangles[i + 1]);
-        neighbors.add(delaunay.triangles[i + 2]);
-      }
+  // Получить соседей ближайшей точки
+  const neighbors = new Set<number>();
+  // Перебираем треугольники
+  for (let i = 0; i < delaunay.triangles.length; i += 3) {
+    if (
+      delaunay.triangles[i] === nearestIndex ||
+      delaunay.triangles[i + 1] === nearestIndex ||
+      delaunay.triangles[i + 2] === nearestIndex
+    ) {
+      // Если треугольник содержит ближайшую точку, добавьте его вершины в набор соседей
+      neighbors.add(delaunay.triangles[i]);
+      neighbors.add(delaunay.triangles[i + 1]);
+      neighbors.add(delaunay.triangles[i + 2]);
     }
-    // Удалить саму ближайшую точку из набора
-    neighbors.delete(nearestIndex);
+  }
+  // Удалить саму ближайшую точку из набора
+  neighbors.delete(nearestIndex);
 
-    // Преобразуйте индексы соседей обратно в точки
-    const neighborPoints: [number, number][] = [];
-    neighbors.forEach((index) => {
-      neighborPoints.push(points[index]);
-    });
-
-    // TODO: Делайте это только в том случае, если мы решим, что нам нужна выпуклая оболочка.
-    // Вычислить выпуклую оболочку соседних точек
-    // const hull = d3.polygonHull(neighborPoints);
-
-    // Сопоставьте точки корпуса с исходными узлами
-    const hullNodes = neighborPoints?.map(
-      ([hx, hy]) => nodes.find((node) => node.x === hx && node.y === hy)!,
-    );
-
-    return hullNodes || [];
+  // Преобразуйте индексы соседей обратно в точки
+  const neighborPoints: [number, number][] = [];
+  neighbors.forEach((index) => {
+    neighborPoints.push(points[index]);
   });
+
+  // TODO: Делайте это только в том случае, если мы решим, что нам нужна выпуклая оболочка.
+  // Вычислить выпуклую оболочку соседних точек
+  // const hull = d3.polygonHull(neighborPoints);
+
+  // Сопоставьте точки корпуса с исходными узлами
+  const hullNodes = neighborPoints?.map(
+    ([hx, hy]) => nodes.find((node) => node.x === hx && node.y === hy)!,
+  );
+
+  return hullNodes || [];
 }
 
 export function findFurthestNodes(
@@ -153,8 +151,8 @@ export function findFurthestNodes(
 ): Node[] {
   return nodes
     .filter((node) => node.id !== nodeA.id)
-    .sort((a, b) => distance(b, nodeA) - distance(a, nodeA))
-    .slice(0, furthestCount);
+    .sort((a, b) => distance(b, nodeA) - distance(a, nodeA));
+  // .slice(0, furthestCount);
 }
 
 export function getFinalNodes(nodes: Node[], links: Link[]) {
@@ -265,25 +263,18 @@ export function GrafGeneratorData(
   const points = nodes.map((node) => [node.x, node.y] satisfies Point);
   const delaunay = d3.Delaunay.from(points);
 
-  const hulls: Node[][] = smallestConvexHullAroundPoint(
-    delaunay,
-    nodes,
-    finalNodes,
-  );
-
   const maxDistance = 300;
   const lengthFinalNodePercentage = Math.round(100 / finalNodes.length);
   const maxIterationFinalNodes = connectionControl / lengthFinalNodePercentage;
 
   for (let i = 0; i < finalNodes.length; i++) {
     if (i >= maxIterationFinalNodes) break;
-
+    const hull = smallestConvexHullAroundPoint(delaunay, nodes, finalNodes[i]);
     const finalNode = finalNodes[i];
-    let furthestNodes = findFurthestNodes(hulls[i], finalNode, 20);
+    let furthestNodes = findFurthestNodes(hull, finalNode, 20);
     let targetNode = furthestNodes.find(
-      (node) =>
-        !finalNodes.some((fn) => fn.id === node.id) &&
-        distance(finalNode, node) <= maxDistance,
+      (node) => !finalNodes.some((fn) => fn.id === node.id), //&&
+      // distance(finalNode, node) <= maxDistance,
     );
 
     if (targetNode) {

@@ -3,31 +3,47 @@
 import { useState } from "react";
 import Header from "./component/Header";
 import Main from "./component/Main";
+import { useControls } from "leva";
 
 export default function StartPage() {
-  const [widthFieldSize, setWidthFieldSize] = useState<number>(0);
-  const [heightFieldSize, setHeightFieldSize] = useState<number>(0);
-  const [amountPoints, setAmountPoints] = useState<number>(0);
-  const [randomSeed, setRandomSeed] = useState<number>(0);
-  const [connectionControl, setConnectionControl] = useState<number>(0);
-
-  function getFieldSizes(fieldWidth: number, fieldHeight: number) {
-    setWidthFieldSize(fieldWidth);
-    setHeightFieldSize(fieldHeight);
-  }
-  function getDataUser(
-    amountPoints: number,
-    randomSeed: number,
-    connectionControl: number,
-  ) {
-    setAmountPoints(amountPoints);
-    setRandomSeed(randomSeed);
-    setConnectionControl(connectionControl);
-  }
+  const {
+    amountPoints,
+    randomSeed,
+    widthFieldSize,
+    heightFieldSize,
+    connectionControl,
+  } = useControls({
+    amountPoints: {
+      value: 100,
+      min: 2,
+      step: 1,
+    },
+    widthFieldSize: {
+      value: 1024,
+      min: 128,
+      max: 8192,
+      step: 1,
+    },
+    heightFieldSize: {
+      value: 1024,
+      min: 128,
+      max: 8192,
+      step: 1,
+    },
+    randomSeed: {
+      value: 0,
+      step: 1,
+    },
+    connectionControl: {
+      value: 50,
+      min: 0,
+      max: 100,
+      step: 1,
+    },
+  });
 
   return (
     <>
-      <Header getFieldSizes={getFieldSizes} getDataUser={getDataUser} />
       <Main
         amountPoints={amountPoints}
         randomSeed={randomSeed}

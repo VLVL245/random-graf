@@ -1,15 +1,16 @@
 "use client";
 
 import * as d3 from "d3";
-import { useEffect, useMemo, useRef /*, useState*/ } from "react";
+import { useEffect, useMemo, useRef, useState /*, useState*/ } from "react";
 import {
   Node,
   Link,
   GrafGeneratorData,
-  //smallestConvexHullAroundPoint,
+  smallestConvexHullAroundPoint,
 } from "../server/GrafGeneratorData";
 import { Delaunay } from "d3";
 import Point = Delaunay.Point;
+import { schemeDark2 } from "d3-scale-chromatic";
 
 interface MainProps {
   widthFieldSize: number;
@@ -50,7 +51,7 @@ export default function Main({
     ],
   );
 
-  //const [hull /*, setHull*/] = useState<Node[] | undefined>();
+  const [hull, setHull] = useState<Node[] | undefined>();
   const delaunay = useMemo(() => {
     const points = nodes.map((node) => [node.x, node.y] satisfies Point);
     return d3.Delaunay.from(points);
@@ -64,25 +65,6 @@ export default function Main({
     if (delaunay) {
       svg.selectAll("*").remove();
 
-      svg
-        .selectAll("circle")
-        .data(nodes)
-        .enter()
-        .append("circle")
-        .attr("cx", (d) => d.x || 0)
-        .attr("cy", (d) => d.y || 0)
-        .attr("r", 5)
-        //.attr("style", "cursor: pointer;")
-        .attr("fill", (d) => {
-          //if (hull?.map((n) => n.id).includes(d.id)) {
-          //  return "#ff0000";
-          //}
-          return d3.schemeCategory10[d.group];
-        });
-      //.on("click", (event, node) => {
-      //  setHull(smallestConvexHullAroundPoint(delaunay, nodes, node));
-      //});
-
       // Рисуем линии для связей
       svg
         .selectAll("line")
@@ -93,7 +75,27 @@ export default function Main({
         .attr("y1", (d) => nodes.find((node) => node.id === d.source)?.y || 0)
         .attr("x2", (d) => nodes.find((node) => node.id === d.target)?.x || 0)
         .attr("y2", (d) => nodes.find((node) => node.id === d.target)?.y || 0)
-        .attr("stroke", "black");
+        .attr("stroke-width", "3px")
+        .attr("stroke", "rgb(209 213 219)");
+
+      svg
+        .selectAll("circle")
+        .data(nodes)
+        .enter()
+        .append("circle")
+        .attr("cx", (d) => d.x || 0)
+        .attr("cy", (d) => d.y || 0)
+        .attr("r", 7)
+        .attr("style", "cursor: pointer;")
+        .attr("fill", (d) => {
+          if (hull?.map((n) => n.id).includes(d.id)) {
+            return "#ff0000";
+          }
+          return d3.schemeDark2[d.group];
+        })
+        .on("click", (event, node) => {
+          setHull(smallestConvexHullAroundPoint(delaunay, nodes, node));
+        });
     }
   }, [
     amountPoints,
@@ -101,13 +103,13 @@ export default function Main({
     links,
     nodes,
     widthFieldSize,
-    //hull,
+    hull,
     delaunay,
   ]);
   console.log(connectionControl);
 
   return (
-    <main className="container mx-auto">
+    <main className="container mx-auto ">
       <svg
         className="mx-auto"
         ref={d3Container}
