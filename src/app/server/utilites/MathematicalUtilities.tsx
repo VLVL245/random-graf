@@ -1,6 +1,6 @@
 //================================================================
 // Изменение нулевой точки
-export function changeVectorZeroPoint(
+/*export function changeVectorZeroPoint(
   vector: Vector2,
   newZero: Vector2,
 ): Vector2 {
@@ -129,4 +129,4 @@ export function getConvexHull(nodes: Node[], links: Link[], centroid: Node) {
   }
 
   return hull.slice(0, 3);
-}
+}*/
